@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <string>
 
 // Forward declarations
 int getTerminalWidth();
@@ -31,6 +31,49 @@ void printColored(Color c, const char* text = "Hello World"){
 }
 void clearScreen(){
     printf("\033[2J\033[H");
+    fflush(stdout);
+}
+std::string clearScreenStr() {
+    return "\033[2J\033[H";
+}
+void hideCursor() {
+    printf("\033[?25l");
+    fflush(stdout);
+}
+
+void showCursor() {
+    printf("\033[?25h");
+    fflush(stdout);
+}
+
+void setCursorPosition(int row, int col) {
+    printf("\033[%d;%dH", row + 1, col + 1);
+    fflush(stdout);
+}
+
+std::string getBackgroundColorCode(Color c) {
+    char colorCode[32];
+    snprintf(colorCode, sizeof(colorCode), "\033[48;2;%d;%d;%dm", c.r, c.g, c.b);
+    return colorCode;  
+}
+
+std::string getTextColorCode(Color c) {
+    char colorCode[32];
+    snprintf(colorCode, sizeof(colorCode), "\033[38;2;%d;%d;%dm", c.r, c.g, c.b);
+    return colorCode;  
+}
+std::string setBackgroundColorStr(Color c) {
+    char colorCode[32];
+    snprintf(colorCode, sizeof(colorCode), "\033[48;2;%d;%d;%dm", c.r, c.g, c.b);
+    return std::string(colorCode);
+}
+std::string setTextColorStr(Color c) {
+    char colorCode[32];
+    snprintf(colorCode, sizeof(colorCode), "\033[38;2;%d;%d;%dm", c.r, c.g, c.b);
+    return std::string(colorCode);
+}
+std::string resetColorsStr() {
+    return "\033[0m";
 }
 
 #ifdef _WIN32
@@ -75,4 +118,87 @@ void setTextColor(Color c){
 void resetColors(){
     printf("\033[0m");
 }
+
+
+
+
+class ScreenBuffer{
+    // reduces printf calls by buffering output and printing it all at once
+    private:
+        char* buffer;
+        size_t bufferSize;
+        size_t contentLength;
+    public:
+        ScreenBuffer(size_t size) : bufferSize(size), contentLength(0) {
+            buffer = (char*)malloc(size);
+            buffer[0] = '\0';
+        }
+        ~ScreenBuffer() {
+            free(buffer);
+        }
+        void append(const char* text) {
+            size_t textLen = strlen(text);
+            if (contentLength + textLen < bufferSize) {
+                strcat(buffer, text);
+                contentLength += textLen;
+            }
+        }
+        void print() {
+            printf("%s", buffer);
+            fflush(stdout);
+            contentLength = 0;
+            buffer[0] = '\0';
+        }
+        void clear() {
+            contentLength = 0;
+            buffer[0] = '\0';
+        }
+        void set(size_t index, char c) {
+            if (index < bufferSize) {
+                buffer[index] = c;
+                if (index >= contentLength) {
+                    contentLength = index + 1;
+                    buffer[contentLength] = '\0';
+                }
+            }
+        }
+        void setText(size_t index, const char* text) {
+            size_t textLen = strlen(text);
+            if (index + textLen < bufferSize) {
+                memcpy(buffer + index, text, textLen);
+                if (index + textLen > contentLength) {
+                    contentLength = index + textLen;
+                    buffer[contentLength] = '\0';
+                }
+            }
+        }
+        void setTxtColor(size_t index, Color c) {
+            char colorCode[32];
+            snprintf(colorCode, sizeof(colorCode), "\033[38;2;%d;%d;%dm", c.r, c.g, c.b);
+            setText(index, colorCode);
+        }
+        void insertColorTag(size_t index, Color c) {
+            char colorCode[32];
+            snprintf(colorCode, sizeof(colorCode), "\033[38;2;%d;%d;%dm", c.r, c.g, c.b);
+            setText(index, colorCode);
+        }
+        void changeColorTo(Color c){
+            // sets the following text color, until next color change or reset
+            char colorCode[32];
+            snprintf(colorCode, sizeof(colorCode), "\033[38;2;%d;%d;%dm", c.r, c.g, c.b);
+            append(colorCode);
+        }
+        void changeBackgroundColorTo(Color c){
+            // sets the following background color, until next color change or reset
+            char colorCode[32];
+            snprintf(colorCode, sizeof(colorCode), "\033[48;2;%d;%d;%dm", c.r, c.g, c.b);
+            append(colorCode);
+        }
+
+};
+
+
+
+
+
 #endif

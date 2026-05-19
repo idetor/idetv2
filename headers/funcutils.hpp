@@ -3,6 +3,55 @@
 #include <string>
 #include <vector>
 
+int getCharLenfromBytes(unsigned char firstByte) {
+    // Single-byte ASCII character (0xxxxxxx)
+    if ((firstByte & 0x80) == 0) {
+        return 1;
+    }
+    
+    // Two-byte character (110xxxxx)
+    if ((firstByte & 0xE0) == 0xC0) {
+        return 2;
+    }
+    
+    // Three-byte character (1110xxxx)
+    if ((firstByte & 0xF0) == 0xE0) {
+        return 3;
+    }
+    
+    // Four-byte character (11110xxx)
+    if ((firstByte & 0xF8) == 0xF0) {
+        return 4;
+    }
+    
+    // Invalid UTF-8 leading byte, treat as single byte
+    return 1;
+}
+
+int charIndexToByteIndex(const std::string& line, int charIndex) {
+    int byteIdx = 0;
+    int charCount = 0;
+    
+    while (charCount < charIndex && byteIdx < (int)line.length()) {
+        byteIdx += getCharLenfromBytes((unsigned char)line[byteIdx]);
+        charCount++;
+    }
+    
+    return byteIdx;
+}
+
+int byteIndexToCharIndex(const std::string& line, int byteIndex) {
+    int charCount = 0;
+    int byteIdx = 0;
+    
+    while (byteIdx < byteIndex && byteIdx < (int)line.length()) {
+        byteIdx += getCharLenfromBytes((unsigned char)line[byteIdx]);
+        charCount++;
+    }
+    
+    return charCount;
+}
+
 std::string intToString(int num) {
     return std::to_string(num);
 }
@@ -35,23 +84,45 @@ std::string vecToString(const std::vector<std::string>& vec) {
     return result;
 }
 
-int getCharLenformBytes(const std::string& str) {
-    int charCount = 0;
-    for (size_t i = 0; i < str.size();) {
-        unsigned char c = str[i];
-        if (c < 128) {
-            i += 1; 
-        } else if ((c >> 5) == 0b110) {
-            i += 2; 
-        } else if ((c >> 4) == 0b1110) {
-            i += 3; 
-        } else if ((c >> 3) == 0b11110) {
-            i += 4; 
-        } else {
-            i += 1; 
-        }
-        charCount++;
+int convertByteIdxToCharIdx(const std::string& line, int byteIdx) {
+    int charIdx = 0;
+    int currentByteIdx = 0;
+    while (currentByteIdx < byteIdx && currentByteIdx < (int)line.length()) {
+        currentByteIdx += getCharLenfromBytes((unsigned char)line[currentByteIdx]);
+        charIdx++;
     }
-    return charCount;
+    return charIdx;
+}
+
+
+
+
+
+
+
+int getByteLenForLeftChar(const std::string& line, int byteIdx) {
+    if (byteIdx <= 0) return 0;
+    int charLen = getCharLenfromBytes((unsigned char)line[byteIdx - 1]);
+    if (byteIdx - charLen < 0) return 0; 
+    return charLen;
+}
+std::string encodeUTF8(int32_t codePoint) {
+    std::string result;
+    if (codePoint <= 0x7F) {
+        result += (char)codePoint;
+    } else if (codePoint <= 0x7FF) {
+        result += (char)(0xC0 | (codePoint >> 6));
+        result += (char)(0x80 | (codePoint & 0x3F));
+    } else if (codePoint <= 0xFFFF) {
+        result += (char)(0xE0 | (codePoint >> 12));
+        result += (char)(0x80 | ((codePoint >> 6) & 0x3F));
+        result += (char)(0x80 | (codePoint & 0x3F));
+    } else if (codePoint <= 0x10FFFF) {
+        result += (char)(0xF0 | (codePoint >> 18));
+        result += (char)(0x80 | ((codePoint >> 12) & 0x3F));
+        result += (char)(0x80 | ((codePoint >> 6) & 0x3F));
+        result += (char)(0x80 | (codePoint & 0x3F));
+    }
+    return result;
 }
 #endif

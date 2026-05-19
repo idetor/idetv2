@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = 
-LDFLAGS = -lX11
+LDFLAGS = 
 TARGET = editor
 SRC = main.cpp
 OBJ = $(SRC:.cpp=.o)

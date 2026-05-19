@@ -11,8 +11,6 @@
     #include <Carbon/Carbon.h>
 #elif defined(__linux__)
     #define PLATFORM_LINUX
-    #include <X11/Xlib.h>
-    #include <X11/keysym.h>
 #endif
 
 // Forward declarations
@@ -23,7 +21,6 @@ int32_t VirtualKeyToStandard(int vkey);
 
 #ifdef PLATFORM_LINUX
 int32_t getKeyboardPress_Linux();
-int32_t KeySymToStandard(KeySym keysym);
 #endif
 
 #ifdef PLATFORM_MACOS
@@ -128,73 +125,109 @@ int32_t VirtualKeyToStandard(int vkey) {
 // ============================================================================
 #ifdef PLATFORM_LINUX
 
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/select.h>
+
+static struct termios old_tio, new_tio;
+static int initialized = 0;
+
+void initTerminal() {
+    if (initialized) return;
+    tcgetattr(STDIN_FILENO, &old_tio);
+    new_tio = old_tio;
+    new_tio.c_lflag &= (~ICANON & ~ECHO);
+    new_tio.c_cc[VMIN] = 1;    // Blocking reads - wait for at least 1 byte
+    new_tio.c_cc[VTIME] = 0;   // No timeout between characters
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
+    initialized = 1;
+}
+
+void resetTerminal() {
+    if (!initialized) return;
+    tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
+    initialized = 0;
+}
+
 int32_t getKeyboardPress_Linux() {
-    Display *display = XOpenDisplay(nullptr);
-    if (!display) return -1;
+    initTerminal();
     
-    Window root = DefaultRootWindow(display);
-    XSelectInput(display, root, KeyPressMask);
+    unsigned char c;
+    ssize_t nread = read(STDIN_FILENO, &c, 1);
+    if (nread != 1) return -1;
     
-    XEvent event;
-    int32_t keyCode = -1;
+    // Handle regular ASCII
+    if (c != 27) { // Not escape character
+        return (int32_t)c;
+    }
     
-    while (true) {
-        XNextEvent(display, &event);
+    // Handle escape sequences
+    unsigned char seq[8] = {0};
+    seq[0] = c; // Store the ESC
+    
+    // Use select to see if more bytes are available within a timeout
+    struct timeval tv;
+    fd_set readfds;
+    int seqIdx = 1;
+    
+    // Try to read up to 7 more bytes (for longer sequences)
+    for (int i = 0; i < 7; i++) {
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        tv.tv_sec = 0;
+        tv.tv_usec = 100000; // 100ms timeout - longer to catch all bytes
         
-        if (event.type == KeyPress) {
-            KeySym keysym = XLookupKeysym(&event.xkey, 0);
-            keyCode = KeySymToStandard(keysym);
-            break;
+        int ret = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv);
+        if (ret > 0 && FD_ISSET(STDIN_FILENO, &readfds)) {
+            nread = read(STDIN_FILENO, &seq[seqIdx], 1);
+            if (nread == 1) {
+                seqIdx++;
+                // Check if sequence is complete (ends with letter or ~)
+                if ((seq[seqIdx-1] >= 'A' && seq[seqIdx-1] <= 'Z') ||
+                    (seq[seqIdx-1] >= 'a' && seq[seqIdx-1] <= 'z') ||
+                    seq[seqIdx-1] == '~') {
+                    break; // Sequence is complete
+                }
+            } else {
+                break;
+            }
+        } else {
+            break; // Timeout - no more bytes available
         }
     }
     
-    XCloseDisplay(display);
-    return keyCode;
-}
-
-int32_t KeySymToStandard(KeySym keysym) {
-    // Map X11 KeySyms to standard keycodes
-    switch (keysym) {
-        case XK_Escape:     return 27;
-        case XK_Return:     return 13;
-        case XK_Tab:        return 9;
-        case XK_BackSpace:  return 8;
-        case XK_space:      return 32;
-        case XK_Up:         return 1000;
-        case XK_Down:       return 1001;
-        case XK_Left:       return 1002;
-        case XK_Right:      return 1003;
-        case XK_Home:       return 1004;
-        case XK_End:        return 1005;
-        case XK_Delete:     return 1006;
-        case XK_Insert:     return 1007;
-        case XK_Page_Up:    return 1008;
-        case XK_Page_Down:  return 1009;
-        case XK_F1:         return 2000;
-        case XK_F2:         return 2001;
-        case XK_F3:         return 2002;
-        case XK_F4:         return 2003;
-        case XK_F5:         return 2004;
-        case XK_F6:         return 2005;
-        case XK_F7:         return 2006;
-        case XK_F8:         return 2007;
-        case XK_F9:         return 2008;
-        case XK_F10:        return 2009;
-        case XK_F11:        return 2010;
-        case XK_F12:        return 2011;
-        case XK_Control_L:  return 3000;
-        case XK_Control_R:  return 3000;
-        case XK_Shift_L:    return 3001;
-        case XK_Shift_R:    return 3001;
-        case XK_Alt_L:      return 3002;
-        case XK_Alt_R:      return 3002;
-        case XK_Super_L:    return 3003;
-        case XK_Super_R:    return 3004;
-        default:
-            // For ASCII characters
-            if (keysym >= 32 && keysym <= 126) return static_cast<int32_t>(keysym);
-            return static_cast<int32_t>(keysym);
+    // Parse escape sequences
+    if (seqIdx >= 2 && seq[1] == '[') {
+        if (seqIdx == 3) {
+            // Single character sequences: ^[[A, ^[[B, etc
+            switch (seq[2]) {
+                case 'A': return 1000; // Up
+                case 'B': return 1001; // Down
+                case 'C': return 1003; // Right
+                case 'D': return 1002; // Left
+                case 'H': return 1004; // Home
+                case 'F': return 1005; // End
+                default: break;
+            }
+        } else if (seqIdx >= 4 && seq[seqIdx-1] == '~') {
+            // Extended sequences: ^[[5~, ^[[6~, etc
+            switch (seq[2]) {
+                case '3': return 1006; // Delete
+                case '5': return 1008; // Page Up
+                case '6': return 1009; // Page Down
+                default: break;
+            }
+        }
     }
+    
+    // If we read sequence bytes but didn't recognize it, consume and retry
+    if (seqIdx > 1) {
+        return getKeyboardPress_Linux();
+    }
+    
+    // Pure escape key
+    return 27;
 }
 
 #endif // PLATFORM_LINUX

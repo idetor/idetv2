@@ -2,6 +2,7 @@
 #define EDITOR_FUNCTIONS_HPP
 #include "displayEngine.hpp"
 #include "funcutils.hpp"
+#include "debugwriter.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +10,9 @@
 #include <string>
 #include <filesystem>
 #include <chrono>
+#include <fstream>
 namespace fs = std::filesystem;
+
 struct SelectionElement {
     int startX;
     int startY;
@@ -20,6 +23,8 @@ struct SelectionElement {
 struct cursorElement {
     int x;
     int y;
+    Color color;
+    Color BackgroundColor;
     std::string mode;
     std::vector<std::string> utilVec1;
     std::vector<std::string> utilVec2;
@@ -47,6 +52,7 @@ struct FileInfos {
     bool hasChanges;
     int lastModified;
 };
+
 struct File {
     FileInfos context;
     std::vector<std::string> content;
@@ -58,8 +64,97 @@ class Editor {
     File currentFile;
     cursorElement cursor;
     editorSettings settings;
+    int scrollOffsetY = 0;  // Vertical scroll offset
+    int scrollOffsetX = 0;  // Horizontal scroll offset
+    int editorHeight = 0;
+    int editorWidth = 0;
+    std::string utf8Buffer;
+    void updateScrollOffsets() {
+        
+        editorHeight = winInfo.getHeight() - 2;
+        editorWidth = winInfo.getWidth();
+        
+        
+        if (cursor.y < scrollOffsetY) {
+            scrollOffsetY = cursor.y;
+        }
+        if (cursor.y >= scrollOffsetY + editorHeight) {
+            scrollOffsetY = cursor.y - editorHeight + 1;
+        }
+        
+        
+        int lineNumberWidth = settings.showLineNumbers ? 5 : 0;
+        int availableWidth = editorWidth - lineNumberWidth - 1;
+        int cursorScreenX = cursor.x - scrollOffsetX;
+        
+        if (cursorScreenX < 2) {
+            scrollOffsetX = cursor.x - 2;
+        } else if (cursorScreenX >= availableWidth - 2) {
+            scrollOffsetX = cursor.x - availableWidth + 3;
+        }
+        
+        
+        if (scrollOffsetY < 0) scrollOffsetY = 0;
+        if (scrollOffsetX < 0) scrollOffsetX = 0;
+        if (scrollOffsetY > (int)currentFile.content.size() - 1) {
+            scrollOffsetY = (int)currentFile.content.size() - 1;
+        }
+    }
+    
+    void initializeSettings() {
+        settings.showLineNumbers = true;
+        settings.autoIndent = true;
+        settings.syntaxHighlighting = false;
+        settings.tabSize = 4;
+        settings.theme = "default";
+        settings.backgroundColor = {30, 30, 30};
+        settings.textColor = {200, 200, 200};
+        settings.headBackgroundColor = {50, 50, 100};
+        settings.headTextColor = {255, 255, 255};
+    }
+    
+    void loadFileContent(const std::string& filePath) {
+        currentFile.content.clear();
+        FILE* file = fopen(filePath.c_str(), "r");
+        if (file) {
+            char buffer[1024];
+            bool hasLines = false;
+            while (fgets(buffer, sizeof(buffer), file)) {
+                // Remove trailing newline
+                std::string line(buffer);
+                if (!line.empty() && line.back() == '\n') {
+                    line.pop_back();
+                }
+                if (!line.empty() && line.back() == '\r') {
+                    line.pop_back();
+                }
+                currentFile.content.push_back(line);
+                hasLines = true;
+            }
+            fclose(file);
+            
+            
+            if (!hasLines) {
+                currentFile.content.push_back("");
+            }
+        } else {
+            
+            currentFile.content.push_back("");
+        }
+        
+        cursor.x = 0;
+        cursor.y = 0;
+        cursor.mode = "normal";
+        scrollOffsetY = 0;
+        scrollOffsetX = 0;
+    }
+    
     public:
         windowInfo winInfo = windowInfo::getInstance();
+        
+        Editor() {
+            initializeSettings();
+        }
                 
         void openFile(const std::string& filePath){
             // Inserts File info
@@ -99,26 +194,373 @@ class Editor {
             openFile.context = fileInfo;
             openFiles.push_back(openFile);  
             currentFile = openFile;
+            
+            loadFileContent(filePath);
         }
+        
+        void saveFile() {
+            std::ofstream file(currentFile.context.path);
+            if (!file.is_open()) {
+                writeDebugInfo("Error: Could not open file for writing: " + currentFile.context.path);
+                return;
+            }
 
-        void drawUI() {
-            //heading Line
-            clearScreen();
-            setBackgroundColor(settings.headBackgroundColor);
-            setTextColor(settings.headTextColor);
-            printf("Idet v2 - %s \n", currentFile.context.name.c_str());
-            
-            
-
-            //test so print the terminal width and height
-            setBackgroundColor(settings.backgroundColor);
-            setTextColor(settings.textColor);
-            for (int i = 0; i < (winInfo.getHeight() - 2 ); i++) {
-                for (int j = 0; j < winInfo.getWidth(); j++) {
-                    printf(".");
+            for (size_t i = 0; i < currentFile.content.size(); i++) {
+                file << currentFile.content[i];
+                if (i < currentFile.content.size() - 1) {
+                    file << "\n";
                 }
-                printf("\n");
+            }
+
+            if (!file.good()) {
+                writeDebugInfo("Error: Write operation failed for: " + currentFile.context.path);
+                return;
+            }
+
+            file.close();
+            currentFile.context.hasChanges = false;
+            writeDebugInfo("File saved: " + currentFile.context.path);
+        }
+        
+        void handleKeyInput(int32_t key) {
+            if (key == 27) { // Escape
+                cursor.mode = cursor.mode == "normal" ? "insert" : "normal";
+                utf8Buffer.clear();  // Clear buffer on mode switch
+                return;
+            }
+            
+
+            // Arrow keys for cursor movement
+            if (key == 1000) { // Up
+                utf8Buffer.clear();
+                if (cursor.y > 0) cursor.y--;
+                const std::string& line = currentFile.content[cursor.y];
+                if (cursor.x > (int)line.length()) {
+                    cursor.x = (int)line.length();
+                }
+                updateScrollOffsets();
+                return;
+            }
+            if (key == 1001) { // Down
+                utf8Buffer.clear();
+                if (cursor.y < (int)currentFile.content.size() - 1) cursor.y++;
+                const std::string& line = currentFile.content[cursor.y];
+                if (cursor.x > (int)line.length()) {
+                    cursor.x = (int)line.length();
+                }
+                updateScrollOffsets();
+                return;
+            }
+            if (key == 1002) { // Left
+                utf8Buffer.clear();
+                if (cursor.x > 0) {
+                    const std::string& line = currentFile.content[cursor.y];
+                    int byteIdx = cursor.x - 1;
+                    // Scan backwards to find the start of the character
+                    while (byteIdx > 0 && (unsigned char)line[byteIdx] >= 0x80 
+                        && (unsigned char)line[byteIdx] < 0xC0) {
+                        byteIdx--;
+                    }
+                    cursor.x = byteIdx;
+                } else if (cursor.y > 0) {
+                    cursor.y--;
+                    cursor.x = currentFile.content[cursor.y].length();
+                }
+                updateScrollOffsets();
+                return;
+            }
+            if (key == 1003) { // Right
+                utf8Buffer.clear();
+                const std::string& line = currentFile.content[cursor.y];
+                if (cursor.x < (int)line.length()) {
+                    int charLen = getCharLenfromBytes((unsigned char)line[cursor.x]);
+                    cursor.x += charLen;
+                } else if (cursor.y < (int)currentFile.content.size() - 1) {
+                    cursor.y++;
+                    cursor.x = 0;
+                }
+                updateScrollOffsets();
+                return;
+            }
+
+            
+            // Page Up and Page Down
+            if (key == 1008) { // Page Up
+                utf8Buffer.clear();
+                cursor.y = cursor.y - editorHeight > 0 ? cursor.y - editorHeight : 0;
+                if (cursor.x > (int)currentFile.content[cursor.y].length()) {
+                    cursor.x = currentFile.content[cursor.y].length();
+                }
+                updateScrollOffsets();
+                return;
+            }
+            if (key == 1009) { // Page Down
+                utf8Buffer.clear();
+                cursor.y = cursor.y + editorHeight < (int)currentFile.content.size() - 1 
+                    ? cursor.y + editorHeight 
+                    : (int)currentFile.content.size() - 1;
+                if (cursor.x > (int)currentFile.content[cursor.y].length()) {
+                    cursor.x = currentFile.content[cursor.y].length();
+                }
+                updateScrollOffsets();
+                return;
+            }
+            
+            // Home and End keys
+            if (key == 1004) { // Home
+                utf8Buffer.clear();
+                cursor.x = 0;
+                updateScrollOffsets();
+                return;
+            }
+            if (key == 1005) { // End
+                utf8Buffer.clear();
+                cursor.x = currentFile.content[cursor.y].length();
+                updateScrollOffsets();
+                return;
+            }
+            
+            // Text editing
+            if (key == 13) { // Enter
+                utf8Buffer.clear();
+                std::string currentLine = currentFile.content[cursor.y];
+                std::string beforeCursor = currentLine.substr(0, cursor.x);
+                std::string afterCursor = currentLine.substr(cursor.x);
+                
+                currentFile.content[cursor.y] = beforeCursor;
+                currentFile.content.insert(currentFile.content.begin() + cursor.y + 1, afterCursor);
+                
+                cursor.y++;
+                cursor.x = 0;
+                currentFile.context.hasChanges = true;
+                updateScrollOffsets();
+                return;
+            }
+            
+            if (key == 8) { // Backspace
+                utf8Buffer.clear();
+                if (cursor.x > 0) {
+                    int charStart = cursor.x - 1;
+                    while (charStart > 0 && (unsigned char)currentFile.content[cursor.y][charStart] >= 0x80 
+                        && (unsigned char)currentFile.content[cursor.y][charStart] < 0xC0) {
+                        charStart--;
+                    }
+                    int charLen = getCharLenfromBytes((unsigned char)currentFile.content[cursor.y][charStart]);
+                    currentFile.content[cursor.y].erase(charStart, charLen);
+                    cursor.x = charStart;
+                } else if (cursor.y > 0) {
+                    int prevLineLen = currentFile.content[cursor.y - 1].length();
+                    currentFile.content[cursor.y - 1] += currentFile.content[cursor.y];
+                    currentFile.content.erase(currentFile.content.begin() + cursor.y);
+                    cursor.y--;
+                    cursor.x = prevLineLen;
+                }
+                currentFile.context.hasChanges = true;
+                updateScrollOffsets();
+                return;
+            }
+            
+            if (key == 1006) { // Delete
+                utf8Buffer.clear();
+                if (cursor.x < (int)currentFile.content[cursor.y].length()) {
+                    int charLen = getCharLenfromBytes((unsigned char)currentFile.content[cursor.y][cursor.x]);
+                    currentFile.content[cursor.y].erase(cursor.x, charLen);
+                } else if (cursor.y < (int)currentFile.content.size() - 1) {
+                    currentFile.content[cursor.y] += currentFile.content[cursor.y + 1];
+                    currentFile.content.erase(currentFile.content.begin() + cursor.y + 1);
+                }
+                currentFile.context.hasChanges = true;
+                updateScrollOffsets();
+                return;
+            }
+            
+            
+            if (key >= 0 && key <= 255) {
+                unsigned char byte = (unsigned char)key;
+                utf8Buffer += (char)byte;
+                
+                
+                if (isCompleteUTF8(utf8Buffer)) {
+                    currentFile.content[cursor.y].insert(cursor.x, utf8Buffer);
+                    cursor.x += utf8Buffer.length();
+                    currentFile.context.hasChanges = true;
+                    updateScrollOffsets();
+                    utf8Buffer.clear();
+                    return;
+                }
+                
+                return;
             }
         }
+
+        
+        bool isCompleteUTF8(const std::string& buffer) {
+            if (buffer.empty()) return false;
+            
+            unsigned char firstByte = (unsigned char)buffer[0];
+            int expectedLen = getCharLenfromBytes(firstByte);
+            
+            return (int)buffer.length() == expectedLen;
+        }
+        void drawUI() {
+
+            printf("\033[?25l");  
+            fflush(stdout);
+            
+            editorHeight = winInfo.getHeight() - 2;
+            editorWidth = winInfo.getWidth();
+            int lineNumberWidth = settings.showLineNumbers ? 5 : 0;
+            int availableWidth = editorWidth - lineNumberWidth;
+            
+            updateScrollOffsets();
+            
+            int cursorScreenRow = -1;
+            int cursorScreenCol = -1;
+            
+            std::string frameBuffer;
+            frameBuffer.reserve(editorWidth * editorHeight * 4);
+            frameBuffer += clearScreenStr();
+            
+            setBackgroundColor(settings.headBackgroundColor);
+            setTextColor(settings.headTextColor);
+            
+            std::string title = "Idet v2 - " + currentFile.context.name;
+            if (currentFile.context.hasChanges) {
+                title += "*";
+            }
+            
+            title.resize(winInfo.getWidth(), ' ');
+            frameBuffer += title + "\n";
+            
+            frameBuffer += setBackgroundColorStr(settings.backgroundColor);
+            frameBuffer += setTextColorStr(settings.textColor);
+            
+            for (int i = 0; i < (editorHeight - 1); i++) {
+                int lineIdx = scrollOffsetY + i;
+                int screenRow = i + 2;  
+                
+                // Line number
+                if (settings.showLineNumbers) {
+                    frameBuffer += getBackgroundColorCode(settings.headBackgroundColor);
+                    frameBuffer += getTextColorCode(settings.headTextColor);
+                    std::string lineNum = std::to_string(lineIdx + 1);
+                    frameBuffer += std::string(4 - lineNum.length(), ' ');  
+                    frameBuffer += lineNum;
+                    frameBuffer += " ";
+                    frameBuffer += setBackgroundColorStr(settings.backgroundColor);
+                    frameBuffer += setTextColorStr(settings.textColor);
+                }
+                
+                int screenCol = lineNumberWidth + 1;  
+                int screenX = 0;
+                int byteIdx = 0;
+                
+                if (lineIdx < (int)currentFile.content.size()) {
+                    const std::string& line = currentFile.content[lineIdx];
+                    
+                    // Calc the byte index for the start of scrollOffsetX (character position)
+                    int targetByteIdx = 0;
+                    int charCount = 0;
+                    while (charCount < scrollOffsetX && targetByteIdx < (int)line.length()) {
+                        targetByteIdx += getCharLenfromBytes((unsigned char)line[targetByteIdx]);
+                        charCount++;
+                    }
+                    byteIdx = targetByteIdx;
+                    
+                    while (screenX < availableWidth && byteIdx < (int)line.length()) {
+                        int charLen = getCharLenfromBytes((unsigned char)line[byteIdx]);
+                        bool isCursorPos = (lineIdx == cursor.y && byteIdx == cursor.x);
+                        
+                        if (isCursorPos) {
+                            cursorScreenRow = screenRow;
+                            cursorScreenCol = screenCol + screenX;  
+                            frameBuffer += "\033[48;2;100;100;100m";
+                        }
+                        
+                        // Extract and add to frameBuffer
+                        for (int j = 0; j < charLen && byteIdx + j < (int)line.length(); j++) {
+                            frameBuffer += line[byteIdx + j];
+                        }
+                        
+                        if (isCursorPos) {
+                            frameBuffer += "\033[48;2;" + std::to_string(settings.backgroundColor.r) + ";" +
+                                        std::to_string(settings.backgroundColor.g) + ";" +
+                                        std::to_string(settings.backgroundColor.b) + "m";
+                        }
+                        
+                        byteIdx += charLen;
+                        screenX++;
+                    }
+                    
+                    // Fill remaining space with blank characters
+                    while (screenX < availableWidth) {
+                        // For empty space, cursor position is based on character offset from start of line
+                        int charIdxFromLineStart = scrollOffsetX + screenX;
+                        bool isCursorPos = (lineIdx == cursor.y && charIdxFromLineStart == convertByteIdxToCharIdx(line, cursor.x));
+                        
+                        if (isCursorPos) {
+                            cursorScreenRow = screenRow;
+                            cursorScreenCol = screenCol + screenX;
+                            frameBuffer += "\033[48;2;100;100;100m ";
+                            frameBuffer += "\033[48;2;" + std::to_string(settings.backgroundColor.r) + ";" +
+                                        std::to_string(settings.backgroundColor.g) + ";" +
+                                        std::to_string(settings.backgroundColor.b) + "m";
+                        } else {
+                            frameBuffer += " ";
+                        }
+                        screenX++;
+                    }
+                } else {
+                    // Empty lines
+                    for (int screenX = 0; screenX < availableWidth; screenX++) {
+                        int charIdxFromLineStart = scrollOffsetX + screenX;
+                        bool isCursorPos = (lineIdx == cursor.y && charIdxFromLineStart == 0 && cursor.x == 0);
+                        
+                        if (isCursorPos) {
+                            cursorScreenRow = screenRow;
+                            cursorScreenCol = screenCol + screenX;
+                            frameBuffer += "\033[48;2;100;100;100m ";
+                            frameBuffer += "\033[48;2;" + std::to_string(settings.backgroundColor.r) + ";" +
+                                        std::to_string(settings.backgroundColor.g) + ";" +
+                                        std::to_string(settings.backgroundColor.b) + "m";
+                        } else {
+                            frameBuffer += " ";
+                        }
+                    }
+                }
+                
+                frameBuffer += "\n";
+            }
+            
+            // === STATUS BAR ===
+            frameBuffer += setBackgroundColorStr(settings.headBackgroundColor);
+            frameBuffer += setTextColorStr(settings.headTextColor);
+            
+            char statusBar[512];
+            int totalLines = currentFile.content.size();
+            snprintf(statusBar, sizeof(statusBar), "Line %d/%d, Col %d | ScrollY:%d ScrollX:%d", 
+                    cursor.y + 1, totalLines, cursor.x + 1, scrollOffsetY, scrollOffsetX);
+            
+            std::string statusStr(statusBar);
+            statusStr.resize(editorWidth, ' ');
+            frameBuffer += statusStr;
+            
+            // === ATOMIC OUTPUT ===
+            printf("%s", frameBuffer.c_str());
+            
+            // Reposition cursor
+            if (cursorScreenRow >= 0 && cursorScreenCol >= 0) {
+                printf("\033[%d;%dH", cursorScreenRow, cursorScreenCol);
+            }
+            
+            printf("\033[?25h");  // Show cursor
+            fflush(stdout);
+            
+            resetColors();
+        }
+
+
+
+
 };
 #endif
