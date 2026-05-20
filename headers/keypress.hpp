@@ -138,6 +138,7 @@ void initTerminal() {
     tcgetattr(STDIN_FILENO, &old_tio);
     new_tio = old_tio;
     new_tio.c_lflag &= (~ICANON & ~ECHO);
+    new_tio.c_iflag &= ~(IXON | IXOFF);  // Disable flow control (Ctrl+S and Ctrl+Q)
     new_tio.c_cc[VMIN] = 1;    // Blocking reads - wait for at least 1 byte
     new_tio.c_cc[VTIME] = 0;   // No timeout between characters
     tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
