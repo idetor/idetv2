@@ -529,6 +529,7 @@ class Editor {
                     }
                 } else {
                     // Empty lines
+                    
                     for (int screenX = 0; screenX < availableWidth; screenX++) {
                         int charIdxFromLineStart = scrollOffsetX + screenX;
                         bool isCursorPos = (lineIdx == cursor.y && charIdxFromLineStart == 0 && cursor.x == 0);
@@ -536,12 +537,13 @@ class Editor {
                         if (isCursorPos) {
                             cursorScreenRow = screenRow;
                             cursorScreenCol = screenCol + screenX;
-                            frameBuffer += "\033[48;2;100;100;100m ";
-                            frameBuffer += "\033[48;2;" + std::to_string(settings.backgroundColor.r) + ";" +
-                                        std::to_string(settings.backgroundColor.g) + ";" +
-                                        std::to_string(settings.backgroundColor.b) + "m";
+                            frameBuffer += "\033[48;2;200;200;200m ";
+                            //frameBuffer += "\033[48;2;" + std::to_string(settings.backgroundColor.r) + ";" +
+                            //            std::to_string(settings.backgroundColor.g) + ";" +
+                            //            std::to_string(settings.backgroundColor.b) + "m";
                         } else {
-                            frameBuffer += " ";
+                            frameBuffer += "\033[48;2;0;0;0m ";
+                            //frameBuffer += " ";
                         }
                     }
                 }
