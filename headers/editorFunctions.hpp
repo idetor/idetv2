@@ -3,6 +3,7 @@
 #include "displayEngine.hpp"
 #include "funcutils.hpp"
 #include "debugwriter.hpp"
+#include "keypress.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,6 +70,8 @@ class Editor {
     int editorHeight = 0;
     int editorWidth = 0;
     std::string utf8Buffer;
+
+
     void updateScrollOffsets() {
         
         editorHeight = winInfo.getHeight() - 2;
@@ -155,7 +158,21 @@ class Editor {
         Editor() {
             initializeSettings();
         }
-                
+        bool checkQuit(){
+        // q is 113
+            if (currentFile.context.hasChanges){
+                std::string warnStr = inBox("You have unsaved changes! Press q again to quit.");
+                printf("%s", warnStr.c_str());
+                int k = getKeyboardPress();
+                if ( k == 113 ){
+                    return true;
+                }
+                else { 
+                    return false;
+                }
+            }
+            return true;
+        }
         void openFile(const std::string& filePath){
             // Inserts File info
             FileInfos fileInfo;
