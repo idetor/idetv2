@@ -378,6 +378,19 @@ class Editor {
                 // implement cut later
                 return;
             }
+            if (key == 10) {
+                // Return
+                if (cursor.y < currentFile.content.size() - 1) {
+                    std::string restOfLine = currentFile.content[cursor.y].substr(cursor.x);
+                    currentFile.content[cursor.y].erase(cursor.x);
+                    currentFile.content.insert(currentFile.content.begin() + cursor.y + 1, restOfLine);
+                    cursor.y++;
+                    cursor.x = 0;
+                    currentFile.context.hasChanges = true;
+                    updateScrollOffsets();
+                }
+                return;
+            }
 
             if (key >= 0 && key <= 255) {
                 unsigned char byte = (unsigned char)key;
