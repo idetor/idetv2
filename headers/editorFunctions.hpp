@@ -381,11 +381,7 @@ class Editor {
             if ( key == 19 ) {
                 saveFile();
             }
-            if ( key == 17 ) {
-                // later add popup if not saved
-                return;
 
-            }
             if (key == 10) {
                 // Return
                 if (cursor.y < currentFile.content.size() - 1) {
