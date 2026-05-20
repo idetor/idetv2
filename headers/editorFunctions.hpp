@@ -374,7 +374,11 @@ class Editor {
                 return;
             }
             
-            
+            if (key == 24) {
+                // implement cut later
+                return;
+            }
+
             if (key >= 0 && key <= 255) {
                 unsigned char byte = (unsigned char)key;
                 utf8Buffer += (char)byte;
