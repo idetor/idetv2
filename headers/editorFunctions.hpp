@@ -179,8 +179,15 @@ class Editor {
             cursor.selection = selection;
         }
         void updateSelect(){
+            
             cursor.selection.endX = cursor.x;
             cursor.selection.endY = cursor.y;
+            if (cursor.selection.startX < cursor.selection.endX) {
+                std::swap(cursor.selection.startX, cursor.selection.endX);
+            }
+            if (cursor.selection.startY < cursor.selection.endY) {
+                std::swap(cursor.selection.startY, cursor.selection.endY);
+            }
         }
         std::string getSelectionInfoStr(){
             return "StartX: " + std::to_string(cursor.selection.startX) + 
