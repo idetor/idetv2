@@ -340,7 +340,7 @@ class Editor {
             }
             
             // Text editing
-            if (key == 13) { // Enter
+            if (key == 10 || key == 13) { // Enter
                 utf8Buffer.clear();
                 std::string currentLine = currentFile.content[cursor.y];
                 std::string beforeCursor = currentLine.substr(0, cursor.x);
