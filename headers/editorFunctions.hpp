@@ -168,13 +168,21 @@ class Editor {
             selection.startY = cursor.y;
             selection.endX = cursor.x;
             selection.endY = cursor.y;
+            selection.isActive = true;
             cursor.selection = selection;
         }
         void updateSelect(){
             cursor.selection.endX = cursor.x;
             cursor.selection.endY = cursor.y;
         }
+        std::string getSelectionInfoStr(){
+            return "StartX: " + std::to_string(cursor.selection.startX) + 
+                ", StartY: " + std::to_string(cursor.selection.startY) + 
+                ", EndX: " + std::to_string(cursor.selection.endX) + 
+                ", EndY: " + std::to_string(cursor.selection.endY) + 
+                ", isActive: " + boolToString(cursor.selection.isActive);
 
+        }
         windowInfo winInfo = windowInfo::getInstance();
         
         Editor() {
@@ -270,15 +278,33 @@ class Editor {
                 return;
             }
             
-            if (key == 1013){
+            if (key == 1013){ // shift + right
                 moveCursorTo(cursor.x + 1, cursor.y);
                 if (cursor.selection.isActive){
                     updateSelect();
+                    return;
                 }
                 else{
                     startSelect();
+                    return;
                 }
                 return;
+            }
+            if (key == 1012){
+                if (cursor.x == 0){
+                    return;
+                }
+                moveCursorTo(cursor.x -1, cursor.y);
+                if (cursor.selection.isActive){
+                    updateSelect();
+                    return;
+                }
+                else{
+                    startSelect();
+                    return;
+                }
+                return;
+
             }
 
 
@@ -453,7 +479,7 @@ class Editor {
             if (key >= 0 && key <= 255) {
                 unsigned char byte = (unsigned char)key;
                 utf8Buffer += (char)byte;
-                
+                cursor.selection.isActive = false;
                 
                 if (isCompleteUTF8(utf8Buffer)) {
                     currentFile.content[cursor.y].insert(cursor.x, utf8Buffer);
@@ -545,24 +571,46 @@ class Editor {
                     while (screenX < availableWidth && byteIdx < (int)line.length()) {
                         int charLen = getCharLenfromBytes((unsigned char)line[byteIdx]);
                         bool isCursorPos = (lineIdx == cursor.y && byteIdx == cursor.x);
-                        
+                        // Selection highlight logic
+                        bool isSelected = false;
+                        if (cursor.selection.isActive) {
+                            int selStartY = cursor.selection.startY;
+                            int selEndY = cursor.selection.endY;
+                            int selStartX = cursor.selection.startX;
+                            int selEndX = cursor.selection.endX;
+                            // Normalize selection
+                            if (selStartY > selEndY || (selStartY == selEndY && selStartX > selEndX)) {
+                                std::swap(selStartY, selEndY);
+                                std::swap(selStartX, selEndX);
+                            }
+                            if (lineIdx > selStartY && lineIdx < selEndY) {
+                                isSelected = true;
+                            } else if (lineIdx == selStartY && lineIdx == selEndY) {
+                                if (byteIdx >= selStartX && byteIdx < selEndX) isSelected = true;
+                            } else if (lineIdx == selStartY) {
+                                if (byteIdx >= selStartX) isSelected = true;
+                            } else if (lineIdx == selEndY) {
+                                if (byteIdx < selEndX) isSelected = true;
+                            }
+                        }
                         if (isCursorPos) {
                             cursorScreenRow = screenRow;
-                            cursorScreenCol = screenCol + screenX;  
+                            cursorScreenCol = screenCol + screenX;
                             frameBuffer += "\033[48;2;100;100;100m";
+                        } else if (isSelected) {
+                            
+                            frameBuffer += "\033[48;2;60;90;200m";
                         }
-                        
                         // Extract and add to frameBuffer
                         for (int j = 0; j < charLen && byteIdx + j < (int)line.length(); j++) {
                             frameBuffer += line[byteIdx + j];
                         }
-                        
-                        if (isCursorPos) {
+                        if (isCursorPos || isSelected) {
+                            // Reset to normal background after selected/cursor char
                             frameBuffer += "\033[48;2;" + std::to_string(settings.backgroundColor.r) + ";" +
                                         std::to_string(settings.backgroundColor.g) + ";" +
                                         std::to_string(settings.backgroundColor.b) + "m";
                         }
-                        
                         byteIdx += charLen;
                         screenX++;
                     }
@@ -624,6 +672,14 @@ class Editor {
 
             snprintf(statusBar, sizeof(statusBar), "Line %d/%d, Col %d | ScrollY:%d ScrollX:%d", 
                     cursor.y + 1, totalLines, cursorCharCol, scrollOffsetY, scrollOffsetX);
+
+            // style the selection if active
+            if (cursor.selection.isActive) {
+                // insert the bg color code at the start of the selection, and reset code at the end
+                
+
+
+            }
 
             std::string statusStr(statusBar);
             statusStr.resize(editorWidth, ' ');

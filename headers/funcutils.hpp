@@ -179,4 +179,16 @@ std::string encodeUTF8(int32_t codePoint) {
     }
     return result;
 }
+std::string insertIntoStr(const std::string& original, size_t index, const std::string& toInsert) {
+    if (index > original.size()) index = original.size();
+    return original.substr(0, index) + toInsert + original.substr(index);
+}
+
+std::string boolToString(bool value){
+    if (value){
+        return "true";
+    }
+    return "false";
+}
+
 #endif

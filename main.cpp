@@ -21,7 +21,7 @@ int main(int argc, char* argv[]){
     } else {
         editor.openFile("untitled.txt");
     }
-    
+    writeToDebugChannel("Selection->" + editor.getSelectionInfoStr());
     while (true) {
         editor.drawUI();
         int32_t key = getKeyboardPress();
@@ -33,7 +33,7 @@ int main(int argc, char* argv[]){
                 break;
             }
             else{
-                return 0;}
+                continue;}
             }
         editor.handleKeyInput(key);
     }
