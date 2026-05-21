@@ -162,6 +162,13 @@ class Editor {
     }
     
     public:
+        void initSelection(){
+            cursor.selection.startX = 0;
+            cursor.selection.startY = 0;
+            cursor.selection.endX = 0;
+            cursor.selection.endY = 0;
+            cursor.selection.isActive = false;
+        }
         void startSelect(){
             SelectionElement selection;
             selection.startX = cursor.x;
@@ -279,32 +286,44 @@ class Editor {
             }
             
             if (key == 1013){ // shift + right
-                moveCursorTo(cursor.x + 1, cursor.y);
                 if (cursor.selection.isActive){
                     updateSelect();
-                    return;
                 }
                 else{
                     startSelect();
-                    return;
                 }
+                moveCursorTo(cursor.x + 1, cursor.y);
+                updateSelect();
                 return;
             }
-            if (key == 1012){
+            if (key == 1012){ //shift + left
                 if (cursor.x == 0){
                     return;
                 }
+                if (cursor.selection.isActive){updateSelect();}
+                else{startSelect();}
                 moveCursorTo(cursor.x -1, cursor.y);
-                if (cursor.selection.isActive){
-                    updateSelect();
+                updateSelect();
+                return;
+            }
+            if (key == 1010){ // shift + up
+                if (cursor.y == 0){
                     return;
+                }
+
+                if (cursor.selection.isActive){updateSelect();}
+                else{startSelect();}
+
+                if (cursor.x > currentFile.content[cursor.y -1 ].length()){
+                    writeToDebugChannel("cursorposX is to high");
+                    moveCursorTo(currentFile.content[cursor.y -1 ].length(), cursor.y -1);
                 }
                 else{
-                    startSelect();
-                    return;
-                }
-                return;
 
+                    moveCursorTo(cursor.x, cursor.y -1);
+                }
+                updateSelect();
+                return;
             }
 
 

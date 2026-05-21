@@ -15,6 +15,7 @@ int main(int argc, char* argv[]){
     hideCursor();
     writeToDebugChannel("");
     Editor editor;
+    editor.initSelection();
     // use arg1 as file path
     if (argc > 1) {
         editor.openFile(argv[1]);
@@ -22,6 +23,7 @@ int main(int argc, char* argv[]){
         editor.openFile("untitled.txt");
     }
     writeToDebugChannel("Selection->" + editor.getSelectionInfoStr());
+    
     while (true) {
         editor.drawUI();
         int32_t key = getKeyboardPress();
