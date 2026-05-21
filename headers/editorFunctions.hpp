@@ -399,6 +399,8 @@ class Editor {
             }
             if ( key == 19 ) {
                 saveFile();
+                currentFile.context.hasChanges = false;
+                return;
             }
 
             if (key == 10) {
@@ -444,7 +446,6 @@ class Editor {
         }
         void drawUI() {
 
-            printf("\033[?25l");  
             fflush(stdout);
             
             editorHeight = winInfo.getHeight() - 2;
@@ -459,10 +460,11 @@ class Editor {
             
             std::string frameBuffer;
             frameBuffer.reserve(editorWidth * editorHeight * 4);
-            frameBuffer += clearScreenStr();
+            frameBuffer += "\033[?25l";  // Hide cursor to prevent flicker
+            frameBuffer += "\033[H";  // Home (move to top-left)
             
-            setBackgroundColor(settings.headBackgroundColor);
-            setTextColor(settings.headTextColor);
+            frameBuffer += setBackgroundColorStr(settings.headBackgroundColor);
+            frameBuffer += setTextColorStr(settings.headTextColor);
             
             std::string title = "Idet v2 - " + currentFile.context.name;
             if (currentFile.context.hasChanges) {
@@ -475,14 +477,14 @@ class Editor {
             frameBuffer += setBackgroundColorStr(settings.backgroundColor);
             frameBuffer += setTextColorStr(settings.textColor);
             
-            for (int i = 0; i < (editorHeight - 1); i++) {
+            for (int i = 0; i < (editorHeight ); i++) {
                 int lineIdx = scrollOffsetY + i;
                 int screenRow = i + 2;  
                 
                 // Line number
                 if (settings.showLineNumbers) {
-                    frameBuffer += getBackgroundColorCode(settings.headBackgroundColor);
-                    frameBuffer += getTextColorCode(settings.headTextColor);
+                    frameBuffer += setBackgroundColorStr(settings.headBackgroundColor);
+                    frameBuffer += setTextColorStr(settings.headTextColor);
                     std::string lineNum = std::to_string(lineIdx + 1);
                     frameBuffer += std::string(4 - lineNum.length(), ' ');  
                     frameBuffer += lineNum;
@@ -578,27 +580,31 @@ class Editor {
             frameBuffer += setBackgroundColorStr(settings.headBackgroundColor);
             frameBuffer += setTextColorStr(settings.headTextColor);
             
+            
+            char statusPosCmd[32];
+            snprintf(statusPosCmd, sizeof(statusPosCmd), "\033[%d;1H", winInfo.getHeight());
+            frameBuffer += statusPosCmd;
+            
             char statusBar[512];
             int totalLines = currentFile.content.size();
+            int cursorCharCol = convertByteIdxToCharIdx(currentFile.content[cursor.y], cursor.x) + 1;
+
             snprintf(statusBar, sizeof(statusBar), "Line %d/%d, Col %d | ScrollY:%d ScrollX:%d", 
-                    cursor.y + 1, totalLines, cursor.x + 1, scrollOffsetY, scrollOffsetX);
-            
+                    cursor.y + 1, totalLines, cursorCharCol, scrollOffsetY, scrollOffsetX);
+
             std::string statusStr(statusBar);
             statusStr.resize(editorWidth, ' ');
             frameBuffer += statusStr;
-            
-            // === ATOMIC OUTPUT ===
-            printf("%s", frameBuffer.c_str());
-            
-            // Reposition cursor
             if (cursorScreenRow >= 0 && cursorScreenCol >= 0) {
-                printf("\033[%d;%dH", cursorScreenRow, cursorScreenCol);
+                char posBuf[32];
+                snprintf(posBuf, sizeof(posBuf), "\033[%d;%dH", cursorScreenRow, cursorScreenCol);
+                frameBuffer += posBuf;
             }
-            
-            printf("\033[?25h");  // Show cursor
+            // === ATOMIC OUTPUT ===
+            frameBuffer += resetColorsStr();
+            frameBuffer += "\033[?25h";  // Show cursor
             fflush(stdout);
-            
-            resetColors();
+            printf("%s", frameBuffer.c_str());
         }
 
 

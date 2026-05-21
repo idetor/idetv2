@@ -137,7 +137,22 @@ std::string inBox(std::string stringToContain, int marginTop = 2, int marginBott
     return result;
 }
 
-
+std::string stringBefore(std::string str, char delimiter) {
+    size_t pos = str.find(delimiter);
+    if (pos != std::string::npos) {
+        return str.substr(0, pos);
+    }
+    return str; 
+}
+int stringCharLength(const std::string& str) {
+    int length = 0;
+    int byteIdx = 0;
+    while (byteIdx < (int)str.length()) {
+        byteIdx += getCharLenfromBytes((unsigned char)str[byteIdx]);
+        length++;
+    }
+    return length;
+}
 
 int getByteLenForLeftChar(const std::string& line, int byteIdx) {
     if (byteIdx <= 0) return 0;
