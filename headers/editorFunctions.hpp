@@ -354,7 +354,7 @@ class Editor {
                 return;
             }
             
-            if (key == 8) { // Backspace
+            if (key == 127) { // Backspace
                 utf8Buffer.clear();
                 if (cursor.x > 0) {
                     int charStart = cursor.x - 1;
