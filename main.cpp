@@ -37,11 +37,11 @@ int main(int argc, char* argv[]){
         int32_t key = getKeyboardPress();
         debugWriter.write("Key pressed: " + intToString(key));
         // Ctrl + S to save
-        if (key == 'S' || key == 's') {
-            debugWriter.write("indicated save on top lvl");
-            editor.handleKeyInput(key);
-            continue;
-        }
+        //if (key == 'S' || key == 's') {
+        //    debugWriter.write("indicated save on top lvl");
+        //    editor.handleKeyInput(key);
+        //    continue;
+        //}
         
         // Ctrl + Q to quit - Check if we receive a control sequence
         if (key == 999999) { // Ctrl key code // DISABLED
