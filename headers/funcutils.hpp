@@ -97,8 +97,11 @@ int convertByteIdxToCharIdx(const std::string& line, int byteIdx) {
 
 
 std::string inBox(std::string stringToContain, int marginTop = 2, int marginBottom = 2, 
-                  int marginLeft = 2, int marginRight = 2, int margin = 2, char toSurround = '*') {
-    
+                  int marginLeft = 2, int marginRight = 2, int margin = 2, char toSurround = '@', int overprint = 10) {
+    std::string emptyString = "";
+    for (int i = 0; i < overprint; ++i) {
+        emptyString += " ";
+    }
     int top = marginTop;
     int bottom = marginBottom;
     int left = marginLeft;
@@ -106,30 +109,30 @@ std::string inBox(std::string stringToContain, int marginTop = 2, int marginBott
     size_t stringLength = stringToContain.length();
     size_t boxWidth = stringLength + left + right + 2; 
     std::string result;
-    result += std::string(boxWidth, toSurround) + "\n";    
+    result += std::string(boxWidth, toSurround) + emptyString +"\n";    
     for (int i = 0; i < top; ++i) {
         result += toSurround;
         result += std::string(boxWidth - 2, ' ');
-        result += toSurround + "\n";
+        result += toSurround + emptyString + "\n";
     }    
     int totalInnerWidth = boxWidth - 2; 
-    int textPadding = (totalInnerWidth - stringLength) / 2;
-    int rightPadding = totalInnerWidth - stringLength - textPadding;
-    
+    int textPadding = left;
+    int rightPadding = right;
+
+
     result += toSurround;
     result += std::string(textPadding, ' ');
-    result += stringToContain;
-    result += std::string(rightPadding, ' ');
-    result += toSurround + "\n";
+    result += stringToContain + std::string(rightPadding, ' ');
+    result += toSurround + emptyString + "\n";
     
     
     for (int i = 0; i < bottom; ++i) {
         result += toSurround;
         result += std::string(boxWidth - 2, ' ');
-        result += toSurround + "\n";
+        result += toSurround + emptyString + "\n";
     }
     
-    result += std::string(boxWidth, toSurround) + "\n";
+    result += std::string(boxWidth, toSurround) + emptyString + "\n";
     
     return result;
 }

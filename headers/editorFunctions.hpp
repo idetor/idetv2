@@ -162,6 +162,8 @@ class Editor {
         // q is 113
             if (currentFile.context.hasChanges){
                 std::string warnStr = inBox("You have unsaved changes! Press q again to quit.");
+                // clear screen
+                clearScreen();
                 printf("%s", warnStr.c_str());
                 int k = getKeyboardPress();
                 if ( k == 113 ){
