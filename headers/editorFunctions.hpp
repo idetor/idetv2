@@ -19,6 +19,7 @@ struct SelectionElement {
     int startY;
     int endX;
     int endY;
+    bool isActive;
 };
 
 struct cursorElement {
@@ -27,6 +28,7 @@ struct cursorElement {
     Color color;
     Color BackgroundColor;
     std::string mode;
+    SelectionElement selection;
     std::vector<std::string> utilVec1;
     std::vector<std::string> utilVec2;
     std::vector<int> utilVec3;
@@ -103,7 +105,14 @@ class Editor {
             scrollOffsetY = (int)currentFile.content.size() - 1;
         }
     }
-    
+    void moveCursorTo(int newX, int newY){
+        if (newY < 0) newY = 0;
+        if (newY >= (int)currentFile.content.size()) newY = (int)currentFile.content.size() - 1;
+        cursor.x = newX;
+        cursor.y = newY;
+        updateScrollOffsets();
+    }
+
     void initializeSettings() {
         settings.showLineNumbers = true;
         settings.autoIndent = true;
@@ -153,6 +162,19 @@ class Editor {
     }
     
     public:
+        void startSelect(){
+            SelectionElement selection;
+            selection.startX = cursor.x;
+            selection.startY = cursor.y;
+            selection.endX = cursor.x;
+            selection.endY = cursor.y;
+            cursor.selection = selection;
+        }
+        void updateSelect(){
+            cursor.selection.endX = cursor.x;
+            cursor.selection.endY = cursor.y;
+        }
+
         windowInfo winInfo = windowInfo::getInstance();
         
         Editor() {
@@ -248,6 +270,17 @@ class Editor {
                 return;
             }
             
+            if (key == 1013){
+                moveCursorTo(cursor.x + 1, cursor.y);
+                if (cursor.selection.isActive){
+                    updateSelect();
+                }
+                else{
+                    startSelect();
+                }
+                return;
+            }
+
 
             // Arrow keys for cursor movement
             if (key == 1000) { // Up

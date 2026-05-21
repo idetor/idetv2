@@ -42,7 +42,7 @@ int main(int argc, char* argv[]){
         
         if ( key == 17 ) {
             if (editor.checkQuit()){
-                // later add popup if not saved
+                
                 break;
             }
             else{

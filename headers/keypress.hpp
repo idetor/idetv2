@@ -16,7 +16,7 @@
 // Forward declarations
 #ifdef PLATFORM_WINDOWS
 int32_t getKeyboardPress_Windows();
-int32_t VirtualKeyToStandard(int vkey);
+int32_t VirtualKeyToStandard(int vkey, bool shift = false);
 #endif
 
 #ifdef PLATFORM_LINUX
@@ -65,7 +65,9 @@ int32_t getKeyboardPress_Windows() {
         ReadConsoleInput(hStdin, &irBuffer, 1, &dwRead);
         
         if (irBuffer.EventType == KEY_EVENT && irBuffer.Event.KeyEvent.bKeyDown) {
-            keyCode = VirtualKeyToStandard(irBuffer.Event.KeyEvent.wVirtualKeyCode);
+            DWORD controlState = irBuffer.Event.KeyEvent.dwControlKeyState;
+            bool shiftHeld = (controlState & SHIFT_PRESSED) != 0;
+            keyCode = VirtualKeyToStandard(irBuffer.Event.KeyEvent.wVirtualKeyCode, shiftHeld);
             break;
         }
     }
@@ -75,8 +77,19 @@ int32_t getKeyboardPress_Windows() {
     return keyCode;
 }
 
-int32_t VirtualKeyToStandard(int vkey) {
+int32_t VirtualKeyToStandard(int vkey, bool shift) {
     // Map Windows virtual keys to standard keycodes
+    // Handle Shift+Arrow combinations first
+    if (shift) {
+        switch (vkey) {
+            case VK_UP:     return 1010;  // Shift+Up
+            case VK_DOWN:   return 1011;  // Shift+Down
+            case VK_LEFT:   return 1012;  // Shift+Left
+            case VK_RIGHT:  return 1013;  // Shift+Right
+        }
+    }
+    
+    // Regular keys
     switch (vkey) {
         case VK_ESCAPE:     return 27;
         case VK_RETURN:     return 13;
@@ -211,6 +224,16 @@ int32_t getKeyboardPress_Linux() {
                 case 'F': return 1005; // End
                 default: break;
             }
+        } else if (seqIdx >= 4 && seq[2] == '1' && seq[3] == ';' && seq[4] == '2') {
+
+            char lastChar = seq[seqIdx-1];
+            switch (lastChar) {
+                case 'A': return 1010; // Shift+Up
+                case 'B': return 1011; // Shift+Down
+                case 'C': return 1013; // Shift+Right
+                case 'D': return 1012; // Shift+Left
+                default: break;
+            }
         } else if (seqIdx >= 4 && seq[seqIdx-1] == '~') {
             // Extended sequences: ^[[5~, ^[[6~, etc
             switch (seq[2]) {
@@ -257,5 +280,12 @@ int32_t getKeyboardPress_MacOS() {
 
 #endif // PLATFORM_MACOS
 
+// ============================================================================
+// Key Constants
+// ============================================================================
+#define KEY_SHIFT_UP    1010
+#define KEY_SHIFT_DOWN  1011
+#define KEY_SHIFT_LEFT  1012
+#define KEY_SHIFT_RIGHT 1013
 
 #endif
