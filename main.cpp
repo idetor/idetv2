@@ -35,31 +35,18 @@ int main(int argc, char* argv[]){
     while (true) {
         editor.drawUI();
         int32_t key = getKeyboardPress();
-        debugWriter.write("Key pressed: " + intToString(key));
-        // Ctrl + S to save
-        //if (key == 'S' || key == 's') {
-        //    debugWriter.write("indicated save on top lvl");
-        //    editor.handleKeyInput(key);
-        //    continue;
-        //}
+        writeToDebugChannel("Key presed: " + intToString(key));
+        //debugWriter.write("Key pressed: " + intToString(key));
         
         // Ctrl + Q to quit - Check if we receive a control sequence
-        if (key == 999999) { // Ctrl key code // DISABLED
-            int32_t nextKey = getKeyboardPress();
-            if (nextKey == 81 || nextKey == 113) { // 'Q' or 'q'
-                break;
-            }
-            if (nextKey == 83 || nextKey == 115) { // 'S' or 's'
-                debugWriter.write("indicated save on top lvl");
-                editor.saveFile();
-            }
-            continue;
-        }
+        
         if ( key == 17 ) {
             if (editor.checkQuit()){
                 // later add popup if not saved
                 break;
             }
+            else{
+                return 0;}
             }
         editor.handleKeyInput(key);
     }

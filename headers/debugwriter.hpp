@@ -3,8 +3,16 @@
 // allows to write debug info to a file, used for debugging purposes only, not for end users
 #include <fstream>
 #include <stdio.h>
-
-
+#include <unistd.h>
+/*
+class Debugger {
+    public:
+        void write(std::string& info){
+            info = info + "\n";
+            write(3, info.c_str(), info.length());
+        }
+}
+*/
 class DebugWriter {
     private:
         std::ofstream debugFile;
@@ -83,6 +91,10 @@ void writeDebugInfo(const std::string& info , std::string filePath = "debug.log"
     }
 }
 
+void writeToDebugChannel(std::string info){
+    info = info + "\n";
+    write(3, info.c_str(), info.length());
+}
 
 
 
