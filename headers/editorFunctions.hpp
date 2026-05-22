@@ -570,7 +570,7 @@ class Editor {
             
             std::string frameBuffer;
             frameBuffer.reserve(editorWidth * editorHeight * 4);
-            frameBuffer += "\033[?25l";  // Hide cursor to prevent flicker
+            //frameBuffer += "\033[?25l";  // Hide cursor to prevent flicker
             frameBuffer += "\033[H";  // Home (move to top-left)
             
             frameBuffer += setBackgroundColorStr(settings.headBackgroundColor);

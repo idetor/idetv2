@@ -27,7 +27,7 @@ int main(int argc, char* argv[]){
     while (true) {
         editor.drawUI();
         int32_t key = getKeyboardPress();
-        writeToDebugChannel("Key presed: " + intToString(key));
+        writeToDebugChannel("Key pressed: " + intToString(key));
         
         if ( key == 17 ) {
             if (editor.checkQuit()){
