@@ -182,12 +182,15 @@ class Editor {
             
             cursor.selection.endX = cursor.x;
             cursor.selection.endY = cursor.y;
-            if (cursor.selection.startX < cursor.selection.endX) {
-                std::swap(cursor.selection.startX, cursor.selection.endX);
-            }
-            if (cursor.selection.startY < cursor.selection.endY) {
-                std::swap(cursor.selection.startY, cursor.selection.endY);
-            }
+            //if (cursor.selection.startX < cursor.selection.endX) {
+            //    writeToDebugChannel("Selection->swapping XposCords");
+            //    std::swap(cursor.selection.startX, cursor.selection.endX);
+            //}
+            //if (cursor.selection.startY < cursor.selection.endY) {
+            //    writeToDebugChannel("Selection->swapping YposCords");
+            //    std::swap(cursor.selection.startY, cursor.selection.endY);
+            //}
+            cursor.selection.isActive = true;
         }
         std::string getSelectionInfoStr(){
             return "StartX: " + std::to_string(cursor.selection.startX) + 
@@ -286,6 +289,10 @@ class Editor {
         }
         
         void handleKeyInput(int32_t key) {
+            if (key <= 1003 & key>= 1000){
+                cursor.selection.isActive = false;
+            }
+
             if (key == 27) { // Escape
                 cursor.mode = cursor.mode == "normal" ? "insert" : "normal";
                 utf8Buffer.clear();  // Clear buffer on mode switch
@@ -328,6 +335,24 @@ class Editor {
                 else{
 
                     moveCursorTo(cursor.x, cursor.y -1);
+                }
+                updateSelect();
+                return;
+            }
+            if (key == 1011){
+                if (cursor.y  == currentFile.content.size()){
+                    return;
+                }
+                if (cursor.selection.isActive){
+                    writeToDebugChannel("Selection->updating Selection");
+                    updateSelect();}
+                else{startSelect();}
+                if (cursor.x > currentFile.content[cursor.y + 1].length()){
+                    
+                    moveCursorTo(currentFile.content[cursor.y + 1].length(), cursor.y +1);
+                }
+                else{
+                    moveCursorTo(cursor.x, cursor.y +1);
                 }
                 updateSelect();
                 return;

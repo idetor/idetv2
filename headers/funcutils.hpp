@@ -2,6 +2,10 @@
 #define FUNCUTILS_HPP
 #include <string>
 #include <vector>
+#ifdef _WIN32
+#include <cstdint>
+#endif
+
 
 int getCharLenfromBytes(unsigned char firstByte) {
     // Single-byte ASCII character (0xxxxxxx)
